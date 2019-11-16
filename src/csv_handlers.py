@@ -37,10 +37,10 @@ def extract_all_recipients(folder_path: str):
                             )
             elif ext == ".csv":
                 logger.debug(f"Found .csv file, opening: {str(fpath)}")
-                df_list.append(get_recipient_data_from_csv(myzip.open(file)))
+                df_list.append(get_recipient_data_from_csv(str(fpath)))
 
     df = pd.concat(df_list, sort=False).drop_duplicates()
-    df.to_csv(folder_path.joinpath("all_recipients.csv"))
+    df.to_csv(folder_path.joinpath("all_recipients.csv"), index=False)
 
 
 def get_recipient_data_from_csv(fp: Union[str, BinaryIO, ZipExtFile]):
@@ -54,4 +54,4 @@ def get_recipient_data_from_csv(fp: Union[str, BinaryIO, ZipExtFile]):
 
     logger.debug(f"Reading file: {fp}")
     data = pd.read_csv(fp, low_memory=False, usecols=lambda col: "recipient" in col)
-    return data
+    return data.drop_duplicates()
