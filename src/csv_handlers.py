@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Union, BinaryIO
 from zipfile import ZipFile, ZipExtFile
 import pandas as pd
+import numpy as np
 import logging
 import sys
 
@@ -39,7 +40,14 @@ def extract_all_recipients(folder_path: str):
                 logger.debug(f"Found .csv file, opening: {str(fpath)}")
                 df_list.append(get_recipient_data_from_csv(str(fpath)))
 
-    df = pd.concat(df_list, sort=False).drop_duplicates()
+    df = pd.concat(df_list, sort=False)
+    df = (df.fillna('') \
+          .groupby(df.columns.tolist()).apply(len) \
+          .rename('recipient_count') \
+          .reset_index() \
+          .replace('', np.nan) \
+          .sort_values(by=['recipient_count'], ascending=False))
+    print(df.columns)
     df.to_csv(folder_path.joinpath("all_recipients.csv"), index=False)
 
 
@@ -54,4 +62,4 @@ def get_recipient_data_from_csv(fp: Union[str, BinaryIO, ZipExtFile]):
 
     logger.debug(f"Reading file: {fp}")
     data = pd.read_csv(fp, low_memory=False, usecols=lambda col: "recipient" in col)
-    return data.drop_duplicates()
+    return data

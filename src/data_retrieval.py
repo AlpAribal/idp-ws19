@@ -115,7 +115,7 @@ def download_bulk_in_batches(
         assert response, f"USAspending API returned error: `{response.text}`.`"
 
         response = response.json()
-        file_url = response["url"]
+        file_url = response["file_url"]
         file_name = response["file_name"]
         logger.debug(f"Generated file will be at `{file_url}`.")
 
