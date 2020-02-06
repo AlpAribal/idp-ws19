@@ -1,36 +1,36 @@
 import pandas as pd
 
-def get_cleaned_series(ser: pd.Series) -> pd.Series:
-    ser = ser.str.replace('[\.,]', '', regex=True)
-    ser = ser.str.replace(' +', ' ', regex=True)
-    ser = ser.str.replace(' $','',regex=True)
-    ser = ser.str.replace('^ ','',regex=True)
-    return ser
 
-def get_better_cleaned_series(ser: pd.Series) -> pd.Series:
-    # delete everything except strings and spaces
-    ser = ser.str.replace('[^A-Za-z ]+', '', regex=True)
-    ser = ser.str.replace(' +', ' ', regex=True)
-    ser = ser.str.replace(' $','',regex=True)
-    ser = ser.str.replace('^ ','',regex=True)
+def fix_letters(ser: pd.Series) -> pd.Series:
+    """Fix letters in a pandas.Series.
 
-    return ser
+    Whitespaces before and after "&" and "." are removed if neighboring words are
+    shorter than four letters. Letters except "A-Z0-9#'&" are removed. All double 
+    whitespaces are removed.
+    
+    Does not work in place. All operations are applied to a copy of `ser`.
 
-def fix_letters(ser):
+    Parameters:
+        ser: pandas.Series
+            Series to fix.
+        
+    Returns:
+        pandas.Series
+            A copy of `ser`, to which various letter-level operations were applied.
+    """
     res = ser.copy()
-    # remove dots with very special care
-    # e.g. .COM actually should stick with the name
-    # res = res.str.replace("\.(?!COM)", " ")
-    # there should not be any whitespace before and after "&" if the adjacent word is less than 4 letters
+    # there should not be any whitespace before and after "&" if the adjacent
+    # word is less than 4 letters
     res = res.str.replace("\\b(\\w{1,3})\\s+&\\s+(\\w{1,3})\\b", "\\1&\\2")
-    # there should not be any whitespace before and after "." if the adjacent word is less than 4 letters
+    # there should not be any whitespace before and after "." if the adjacent
+    # word is less than 4 letters
     res = res.str.replace("\\b(\\w{1,3})\\s+\\.\\s+(\\w{1,3})\\b", "\\1.\\2")
     # replace " & " with " AND "
     res = res.str.replace("\\s&\\s", " AND ")
     # replace " . " with "  "
     res = res.str.replace("\\s\\.\\s", "  ")
     # remove notes denoted with "-[NOTE]"
-    res = res.str.replace("(?:[\\b\\s]-?(?:OLD|REDH|CL A|CONSOLIDATED)\\s)+$", "")
+    res = res.str.replace("(?:-?\\s*(?:OLD|REDH|CL A|CONSOLIDATED)\\b\\s*)+$", "")
     # not sure what to do with these: #
     res = res.str.replace("[^A-Z0-9\#'&]", " ")
     # get rid of double spaces
@@ -40,7 +40,6 @@ def fix_letters(ser):
     # trim the whitspaces at the beginning and end
     res = res.str.strip()
     return res
-
 
 
 abbr_table = {
@@ -85,12 +84,26 @@ abbr_table = {
     "\\bEMERG\\b": "EMG",
 }
 
-def fix_words(ser):
+
+def fix_words(ser: pd.Series) -> pd.Series:
+    """Fix words in a pandas.Series.
+
+    Commonly used words are replaced with their abbreviations.
+    
+    Does not work in place. All operations are applied to a copy of `ser`.
+
+    Parameters:
+        ser: pandas.Series
+            Series to fix.
+        
+    Returns:
+        pandas.Series
+            A copy of `ser`, wherein common words were replaced with abbreviations.
+    """
     res = ser.copy()
     # get rid of 'the's at the very end
     res = res.str.replace("\bthe$", "")
-    # abbreviate company typs
+    # abbreviate common words
     for a in abbr_table:
         res = res.str.replace(a, abbr_table[a])
     return res
-
