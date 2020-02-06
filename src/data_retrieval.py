@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import shutil
@@ -8,7 +7,7 @@ from pathlib import Path
 from time import sleep
 from typing import List, Tuple
 
-import httpx
+import requests
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ ALLOWED_TYPES = (
 )
 
 
-async def download_bulk_in_batches(
+def download_bulk_in_batches(
     start_date: str,
     end_date: str,
     dl_path: str,
@@ -37,8 +36,6 @@ async def download_bulk_in_batches(
     sleep_time: int = 1,
 ) -> None:
     """Download awards data in batches.
-
-    Batches are downloaded asynchronously.
 
     Parameters:
         start_date: str
@@ -130,7 +127,7 @@ async def download_bulk_in_batches(
         }
 
         headers = {"Content-Type": "application/json"}
-        response = httpx.post(
+        response = requests.post(
             "https://api.usaspending.gov/api/v2/bulk_download/awards/",
             headers=headers,
             data=json.dumps(req),
@@ -148,53 +145,22 @@ async def download_bulk_in_batches(
 
         wait_list.append((file_name, file_url))
 
-    await asyncio.gather(
-        *[
-            download_file(file_name, file_url, dl_path, sleep_time, logger, pbar)
-            for (file_name, file_url) in wait_list
-        ]
-    )
+    while wait_list:
+        for file_name, file_url in wait_list:
+            # Check whether the file is ready to download
+            file_ready = requests.head(file_url)
+            if file_ready:
+                logger.debug(f"`{file_name}` is ready, starting download.")
+                # Stream the file and write to file on disk
+                with requests.get(file_url, stream=True) as r:
+                    with open(str(dl_path.joinpath(file_name)), "wb") as f:
+                        shutil.copyfileobj(r.raw, f)
+                wait_list.remove((file_name, file_url))
+                logger.debug("File is downloaded, moving to the next.")
+                pbar.update(1)
+        if wait_list:
+            # If there are jobs left, wait for a while before re-checking the urls
+            sleep(sleep_time)
 
     logger.debug("All downloads are completed.")
     logger.removeHandler(ch)
-
-
-async def download_file(
-    file_name, file_url, dl_path, sleep_time=1, logger=None, pbar=None
-):
-    """Download single awards file asynchronously.
-
-    Parameters:
-        file_name: str
-            Name of the file to download.
-        file_url: str
-            Url of the file.
-        dl_path: Pathlike
-            Path to the folder in which awards data batches will be downloaded.
-        sleep_time: int (opt)
-            Number of seconds to wait before rechecking file download links.
-        logger: 
-            Logger to use when logging download events.
-        pbar: tqdm.tqdm
-            tqdm object to update when the download is finished.
-    """
-    while True:
-        await asyncio.sleep(sleep_time)
-        file_ready = httpx.head(file_url)
-        if 200 <= file_ready.status_code <= 299:
-            break
-
-    if logger:
-        logger.debug(f"`{file_name}` is ready, starting download.")
-
-    async with httpx.AsyncClient() as client:
-        async with client.stream("GET", file_url) as r:
-            with open(str(dl_path.joinpath(file_name)), "wb") as f:
-                async for a in r.aiter_raw():
-                    f.write(a)
-
-    if logger:
-        logger.debug(f"Download of `{file_name}` is finished.")
-
-    if pbar:
-        pbar.update(1)
