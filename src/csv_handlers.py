@@ -14,6 +14,12 @@ ch = logging.StreamHandler(sys.stdout)
 ch.setFormatter(format)
 logger.addHandler(ch)
 
+def merge_df_list_to_df(df_list, df):
+    df_list.append(df)
+    df = pd.concat(df_list, sort=False).drop_duplicates()
+    df_list = []
+    return df_list, df
+
 
 def extract_all_recipients(folder_path: str):
     # Assert that the inputs are of correct format
@@ -21,9 +27,16 @@ def extract_all_recipients(folder_path: str):
     folder_path = Path(folder_path)
     assert folder_path.is_dir(), "`folder_path` must be a path to a valid folder."
 
+    df = pd.DataFrame()
     df_list = []
+    df_list_size = 0
     fpath: Path
     for fpath in folder_path.iterdir():
+        # concat dfs when it reached the size of a million
+        if df_list_size >= 1000000:
+            df_list, df = merge_df_list_to_df(df_list, df)
+            df_list_size = 0
+
         if fpath.is_file():
             ext = fpath.suffix.lower()
             if ext == ".zip":
@@ -33,21 +46,15 @@ def extract_all_recipients(folder_path: str):
                     for file in myzip.namelist():
                         if file.split(".")[-1] == "csv":
                             logger.debug(f"Found .csv file in zip, opening: {file}")
-                            df_list.append(
-                                get_recipient_data_from_csv(myzip.open(file))
-                            )
+                            new_df = get_recipient_data_from_csv(myzip.open(file))
+                            df_list.append(new_df)
+                            df_list_size += new_df.shape[0]
+
             elif ext == ".csv":
                 logger.debug(f"Found .csv file, opening: {str(fpath)}")
-                df_list.append(get_recipient_data_from_csv(str(fpath)))
+                df = pd.concat([df, get_recipient_data_from_csv(str(fpath))], sort=False).drop_duplicates()
 
-    df = pd.concat(df_list, sort=False)
-    df = (df.fillna('') \
-          .groupby(df.columns.tolist()).apply(len) \
-          .rename('recipient_count') \
-          .reset_index() \
-          .replace('', np.nan) \
-          .sort_values(by=['recipient_count'], ascending=False))
-    print(df.columns)
+    df_list, df = merge_df_list_to_df(df_list, df)
     df.to_csv(folder_path.joinpath("all_recipients.csv"), index=False)
 
 
@@ -62,4 +69,4 @@ def get_recipient_data_from_csv(fp: Union[str, BinaryIO, ZipExtFile]):
 
     logger.debug(f"Reading file: {fp}")
     data = pd.read_csv(fp, low_memory=False, usecols=lambda col: "recipient" in col)
-    return data
+    return data.drop_duplicates()

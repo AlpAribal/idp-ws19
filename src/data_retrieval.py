@@ -178,10 +178,11 @@ async def download_file(
         pbar: tqdm.tqdm
             tqdm object to update when the download is finished.
     """
-    file_ready = False
-    while not file_ready:
+    while True:
         await asyncio.sleep(sleep_time)
         file_ready = httpx.head(file_url)
+        if 200 <= file_ready.status_code <= 299:
+            break
 
     if logger:
         logger.debug(f"`{file_name}` is ready, starting download.")
