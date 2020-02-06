@@ -3,7 +3,7 @@ from sklearn.metrics.pairwise import linear_kernel
 import numpy as np
 import pandas as pd
 
-def get_cosine_similarities(tfidf, tfidf_USA, thres = 0.4, save_path = 'cosine_similarities.npz', batch_size=100):
+def get_cosine_similarities(tfidf, tfidf_USA, thres = 0.4, save_path = 'processed/cosine_similarities.npz', batch_size=100):
     cosine_similarities = sparse.csr_matrix((tfidf.shape[0],tfidf_USA.shape[0]))
     values = np.zeros(cosine_similarities.shape[0])
     indexes = np.zeros(cosine_similarities.shape[0])
@@ -24,7 +24,7 @@ def get_cosine_similarities(tfidf, tfidf_USA, thres = 0.4, save_path = 'cosine_s
         if batch_start % 1000 == 0:
             print(f'{batch_start} of {tfidf.shape[0]} documents are calculated')
     sparse.save_npz(save_path, cosine_similarities)
-    np.save('max_similarities.npy', values)
+    np.save('processed/max_similarities.npy', values)
 
     return cosine_similarities, values
     # TODO: also save and load values and indexes
