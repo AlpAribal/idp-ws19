@@ -1,4 +1,5 @@
 import pandas as pd
+from postal.expand import expand_address
 
 
 def fix_letters(ser: pd.Series) -> pd.Series:
@@ -18,6 +19,8 @@ def fix_letters(ser: pd.Series) -> pd.Series:
         pandas.Series
             A copy of `ser`, to which various letter-level operations were applied.
     """
+    if not isinstance(ser, pd.Series):
+        ser = pd.Series(ser)
     res = ser.copy()
     # there should not be any whitespace before and after "&" if the adjacent
     # word is less than 4 letters
@@ -100,6 +103,8 @@ def fix_words(ser: pd.Series) -> pd.Series:
         pandas.Series
             A copy of `ser`, wherein common words were replaced with abbreviations.
     """
+    if not isinstance(ser, pd.Series):
+        ser = pd.Series(ser)
     res = ser.copy()
     # get rid of 'the's at the very end
     res = res.str.replace("\bthe$", "")
@@ -107,3 +112,112 @@ def fix_words(ser: pd.Series) -> pd.Series:
     for a in abbr_table:
         res = res.str.replace(a, abbr_table[a])
     return res
+
+
+def fix_addresses(df: pd.DataFrame, addr_cols=None) -> pd.Series:
+    """Fix addresses.
+
+    Joins all address columns in `df` and expands the joined address using `pypostal`.
+    
+    Does not work in place. All operations are applied to a copy of `df`.
+
+    Parameters:
+        df: pandas.DataFrame
+            DataFrame to fix.
+        
+    Returns:
+        pandas.Series
+            Expanded and normalized adresses.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError(f"`df` must be a pandas.DataFrame. Got: {repr(df)}")
+
+    if addr_cols is None:
+        addr_cols = list(df.columns)
+    # replaces NAs with ""
+    addr = df[addr_cols].fillna("").astype("str")
+    # join all address columns into a single string column
+    joined_addr = addr.apply(lambda x: " ".join(x), axis=1)
+    # process only unique values, merge results later
+    uniq = joined_addr.unique()
+
+    def expand(raw_addr):
+        addr = str(raw_addr) if pd.notna(raw_addr) else ""
+        addr = expand_address(addr)
+        return addr[0].upper() if len(addr) > 0 else ""
+
+    res = pd.Series(map(expand, uniq))
+    lookup = pd.DataFrame({"uniq": uniq, "clean": res})
+    return (
+        pd.DataFrame({"joined": joined_addr})
+        .merge(lookup, left_on="joined", right_on="uniq", how="left")["clean"]
+        .values
+    )
+
+
+states = {
+    "AL": "ALABAMA",
+    "AK": "ALASKA",
+    "AZ": "ARIZONA",
+    "AR": "ARKANSAS",
+    "CA": "CALIFORNIA",
+    "CO": "COLORADO",
+    "CT": "CONNECTICUT",
+    "DE": "DELAWARE",
+    "FL": "FLORIDA",
+    "GA": "GEORGIA",
+    "HI": "HAWAII",
+    "ID": "IDAHO",
+    "IL": "ILLINOIS",
+    "IN": "INDIANA",
+    "IA": "IOWA",
+    "KS": "KANSAS",
+    "KY": "KENTUCKY",
+    "LA": "LOUISIANA",
+    "ME": "MAINE",
+    "MD": "MARYLAND",
+    "MA": "MASSACHUSETTS",
+    "MI": "MICHIGAN",
+    "MN": "MINNESOTA",
+    "MS": "MISSISSIPPI",
+    "MO": "MISSOURI",
+    "MT": "MONTANA",
+    "NE": "NEBRASKA",
+    "NV": "NEVADA",
+    "NH": "NEW HAMPSHIRE",
+    "NJ": "NEW JERSEY",
+    "NM": "NEW MEXICO",
+    "NY": "NEW YORK",
+    "NC": "NORTH CAROLINA",
+    "ND": "NORTH DAKOTA",
+    "OH": "OHIO",
+    "OK": "OKLAHOMA",
+    "OR": "OREGON",
+    "PA": "PENNSYLVANIA",
+    "RI": "RHODE ISLAND",
+    "SC": "SOUTH CAROLINA",
+    "SD": "SOUTH DAKOTA",
+    "TN": "TENNESSEE",
+    "TX": "TEXAS",
+    "UT": "UTAH",
+    "VT": "VERMONT",
+    "VA": "VIRGINIA",
+    "WA": "WASHINGTON",
+    "WV": "WEST VIRGINIA",
+    "WI": "WISCONSIN",
+    "WY": "WYOMING",
+    "AS": "AMERICAN SAMOA",
+    "DC": "DISTRICT OF COLUMBIA",
+    "FM": "FEDERATED STATES OF MICRONESIA",
+    "GU": "GUAM",
+    "MH": "MARSHALL ISLANDS",
+    "MP": "NORTHERN MARIANA ISLANDS",
+    "PW": "PALAU",
+    "PR": "PUERTO RICO",
+    "VI": "VIRGIN ISLANDS",
+}
+
+
+def fix_state(state_code):
+    """Convert state code to state name."""
+    return states[state_code] if state_code in states else ""
