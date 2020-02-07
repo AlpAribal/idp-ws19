@@ -8,6 +8,10 @@ echo "REPO_DIR: $REPO_DIR"
 echo "POSTAL_DATA_DIR: $POSTAL_DATA_DIR"
 echo "POSTAL_INSTALL_DIR: $POSTAL_INSTALL_DIR"
 
+mkdir "$REPO_DIR/data"
+mkdir "$REPO_DIR/processed"
+mkdir "$REPO_DIR/results"
+
 cd "$REPO_DIR/.."
 git clone https://github.com/openvenues/libpostal
 cd libpostal
