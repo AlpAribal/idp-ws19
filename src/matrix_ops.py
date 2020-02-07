@@ -3,7 +3,7 @@ from sklearn.metrics.pairwise import linear_kernel
 import numpy as np
 import pandas as pd
 
-def get_cosine_similarities(tfidf, tfidf_USA, thres = 0.4, save_path = 'processed/cosine_similarities.npz', batch_size=100):
+def get_cosine_similarities(tfidf, tfidf_USA, thres = 0.4, save_path = '../processed/cosine_similarities.npz', batch_size=100):
     cosine_similarities = sparse.csr_matrix((tfidf.shape[0],tfidf_USA.shape[0]))
     values = np.zeros(cosine_similarities.shape[0])
     indexes = np.zeros(cosine_similarities.shape[0])
@@ -24,7 +24,7 @@ def get_cosine_similarities(tfidf, tfidf_USA, thres = 0.4, save_path = 'processe
         if batch_start % 1000 == 0:
             print(f'{batch_start} of {tfidf.shape[0]} documents are calculated')
     sparse.save_npz(save_path, cosine_similarities)
-    np.save('processed/max_similarities.npy', values)
+    np.save('../processed/max_similarities.npy', values)
 
     return cosine_similarities, values
     # TODO: also save and load values and indexes
@@ -61,7 +61,10 @@ def get_best_candidates(chair_df, usa_df, cosine_similarities, companies, zip_bo
     for i in range(chair_df.shape[0]):
         chair_candidate = chair_df.iloc[i]
         index = cosine_similarities[i].indices
-
+        
+        if i % 1000 == 0:
+            print(f'{i} of {chair_df.shape[0]} documents are calculated')
+            
         if index.shape[0] == 0:
             continue
 
@@ -87,7 +90,6 @@ def get_best_candidates(chair_df, usa_df, cosine_similarities, companies, zip_bo
         candidate = candidates.loc[candidates.score.astype('float').idxmax()]
         best_matches.iloc[i] = pd.concat([chair_candidate, candidate], axis=0)
 
-        if i % 1000 == 0:
-            print(f'{i} of {chair_df.shape[0]} documents are calculated')
+
 
     return best_matches

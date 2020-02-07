@@ -18,12 +18,10 @@ def _merge_df_list_to_df(df_list, df):
     """Concatenate pandas.DataFrames.
     
     Helper method to concatenate a pd.DataFrame and a list of pd.DataFrames. 
-    `df_list` is emptied after concatenation.
     """
-    df_list.append(df)
-    df = pd.concat(df_list, sort=False).drop_duplicates()
-    df_list = []
-    return df
+    df_list = pd.concat(df_list, sort=False).drop_duplicates()
+    df = pd.concat([df,df_list], sort=False)
+    return [], df
 
 
 def extract_all_recipients(folder_path: str) -> None:
@@ -56,9 +54,9 @@ def extract_all_recipients(folder_path: str) -> None:
     fpath: Path
     for fpath in folder_path.iterdir():
         # concatenate dfs when the total size reaches a million rows
-        if df_list_size >= 1000000:
+        if df_list_size >= 10000000:
             logger.debug(f"Merging df_list. It has {df_list_size} lines.")
-            df = _merge_df_list_to_df(df_list, df)
+            df_list, df = _merge_df_list_to_df(df_list, df)
             df_list_size = 0
 
         if fpath.is_file():
@@ -81,7 +79,8 @@ def extract_all_recipients(folder_path: str) -> None:
                     [df, get_recipient_data_from_csv(str(fpath))], sort=False
                 ).drop_duplicates()
 
-    df_list, df = merge_df_list_to_df(df_list, df)
+    _, df = _merge_df_list_to_df(df_list, df)
+    df = df.drop_duplicates()
     df.to_csv(folder_path.joinpath("all_recipients.csv"), index=False)
     logger.removeHandler(ch)
 
@@ -97,4 +96,4 @@ def get_recipient_data_from_csv(fp: Union[str, BinaryIO, ZipExtFile]):
 
     logger.debug(f"Reading file: {fp}")
     data = pd.read_csv(fp, low_memory=False, usecols=lambda col: "recipient" in col)
-    return data.drop_duplicates()
+    return data
