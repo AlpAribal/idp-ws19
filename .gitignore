@@ -148,6 +148,7 @@ dmypy.json
 # Ignore downloaded and processed data
 data/*
 processed/*
+results/*
 
 # Ignore logs
 *.log
